@@ -4,6 +4,7 @@ import wandb
 from student.evaluate import load_prompt
 from datasets import load_dataset, load_from_disk
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from vllm import LLM
 
 def wandb_init(args):
     wandb.init(
@@ -15,6 +16,22 @@ def wandb_init(args):
     wandb.define_metric("eval_step")
     wandb.define_metric("train/*", step_metric="train_step")
     wandb.define_metric("eval/*", step_metric="eval_step")
+
+
+
+def init_vllm(model_id, seed, gpu_memory_utilisation=1.0):
+    from vllm.model_executor import set_random_seed
+
+    set_random_seed(seed)
+
+    llm = LLM(
+        model_id,
+        dtype="bfloat16",
+        enable_prefix_caching=True,
+        gpu_memory_utilisation= gpu_memory_utilisation
+    )
+
+    return llm
 
 
 
@@ -77,9 +94,12 @@ def train_loop(args):
 
     # run vLLM for specific rollouts for given promo (host policy on vLLM)
 
+    init_vllm()
 
     # score each rollout
-    
+
+
+    #load the updated policy into model
 
     # compute grouped normalised advantages
 
