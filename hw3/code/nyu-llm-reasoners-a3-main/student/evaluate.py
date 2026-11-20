@@ -6,7 +6,8 @@ from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
-from cs336_alignment.drgrpo_grader import question_only_reward_fn
+from student.drgrpo_grader import question_only_reward_fn
+import json
 
 
 def load_prompt(name: str = "intellect") -> str:
@@ -20,12 +21,22 @@ def evaluate(llm, prompts, ground_truths):
     outputs = llm.generate(prompts, params)
 
     correct = 0
+    results = []
     for i, output in enumerate(tqdm(outputs, desc="Grading")):
         text = output.outputs[0].text
         reward = question_only_reward_fn(text, ground_truths[i])
+        results.append({
+            "idx": i,
+            "prompt": prompts[i][:500],
+            "ground_truth": ground_truths[i],
+            "response": text,
+            "format_reward": reward["format_reward"],
+            "answer_reward": reward["answer_reward"],
+            "reward": reward["reward"],           
+        })
         correct += reward["reward"]
 
-    return correct / len(outputs)
+    return correct / len(outputs), results
 
 
 def main():
@@ -61,8 +72,11 @@ def main():
         gts.append(ex.get("ground_truth", ""))
 
     print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts)
-    print(f"Intellect Accuracy: {acc:.4f}")
+    intellect_acc, intellect_results = evaluate(llm, prompts, gts)
+    print(f"Intellect Accuracy: {intellect_acc:.4f}")
+    with open("eval_intellect.json", "w") as f:
+        json.dump({"accuracy": intellect_acc, "results": intellect_results}, f, indent=2)
+
 
     # Evaluate on MATH
     print("\n=== MATH Test ===")
@@ -74,8 +88,13 @@ def main():
     gts = [ex["answer"] for ex in math_ds]
 
     print(f"[Sample] {prompts[0][:200]}...")
-    acc = evaluate(llm, prompts, gts)
-    print(f"MATH Accuracy: {acc:.4f}")
+    math_acc, math_results = evaluate(llm, prompts, gts)
+    print(f"MATH Accuracy: {math_acc:.4f}")
+
+    with open("eval_math.json", "w") as f:
+        json.dump({"accuracy": math_acc, "results": math_results}, f, indent=2)
+
+
 
 
 if __name__ == "__main__":
